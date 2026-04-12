@@ -1,18 +1,39 @@
 const fs = require('fs');
 const { execSync } = require('child_process');
 
-console.log("🔥 Mode Penyelamatan: Memotong kompilasi yang nyangkut...");
+console.log("🔥 Mode Bypass Ekstrem: Mengisolasi Cache & Temp ke Persistent Volume...");
 
-// 1. Sapu bersih folder sampah sisa ekstraksi sebelumnya biar gak bentrok
+// 1. Definisikan folder aman di dalam persistent volume
+const dataDir = '/app/data';
+const npmGlobal = `${dataDir}/npm_global`;
+const npmCache = `${dataDir}/npm_cache`;
+const npmTmp = `${dataDir}/npm_tmp`;
+
+// Bikin foldernya kalau belum ada
 try {
-    execSync("rm -rf /app/data/npm_global/lib/node_modules/.openclaw*");
+    fs.mkdirSync(npmGlobal, { recursive: true });
+    fs.mkdirSync(npmCache, { recursive: true });
+    fs.mkdirSync(npmTmp, { recursive: true });
 } catch(e) {}
 
-// 2. Paksa NPM nge-link shortcut TANPA jalanin script compile yang bikin pingsan (--ignore-scripts)
-if (!fs.existsSync('/app/data/npm_global/bin/openclaw')) {
-    console.log("🔗 Memperbaiki shortcut binari...");
+// 2. Sapu bersih sisa sampah instalasi yang bikin error sebelumnya
+try {
+    execSync(`rm -rf ${npmGlobal}/lib/node_modules/.openclaw*`);
+    execSync(`rm -rf ${npmCache}/*`);
+    execSync(`rm -rf ${npmTmp}/*`);
+} catch(e) {}
+
+// 3. Eksekusi Instalasi dengan Isolasi 100%
+if (!fs.existsSync(`${npmGlobal}/bin/openclaw`)) {
+    console.log("🔗 Menginstal OpenClaw... (Aman dari limit 100MB)");
     try {
-        execSync("node --max-old-space-size=800 /app/data/package/bin/npm-cli.js --prefix /app/data/npm_global install -g openclaw --ignore-scripts", { stdio: 'inherit' });
+        // Kita paksa environment variabel OS buat pindah folder Temp ke /app/data
+        const env = Object.assign({}, process.env, { TMPDIR: npmTmp });
+        
+        // Perhatikan parameter --cache dan --tmp yang baru ditambahkan
+        const npmCmd = `node --max-old-space-size=800 /app/data/package/bin/npm-cli.js --prefix ${npmGlobal} --cache ${npmCache} --tmp ${npmTmp} install -g openclaw --ignore-scripts --no-audit --no-fund --loglevel=error`;
+        
+        execSync(npmCmd, { stdio: 'inherit', env: env });
     } catch(e) {
         console.log("Abaikan jika ada warning, gas lanjut!");
     }
