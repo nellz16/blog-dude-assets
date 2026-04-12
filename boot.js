@@ -1,12 +1,18 @@
 const fs = require('fs');
 const { execSync } = require('child_process');
 
-console.log("🔥 Fix: Membabat argumen palsu yang bikin NPM bingung...");
+console.log("🔥 Fix: Storage Wipe & Clean Install...");
 
 const dataDir = '/app/data';
 const npmGlobal = `${dataDir}/npm_global`;
 const npmCache = `${dataDir}/npm_cache`;
 const npmTmp = `${dataDir}/npm_tmp`;
+
+// 1. SAPU JAGAT: Hapus semua sampah sisa gagal instalasi biar storage lega!
+try {
+    console.log("🧹 Membersihkan storage...");
+    execSync(`rm -rf ${npmCache} ${npmTmp} ${npmGlobal} ${dataDir}/package ${dataDir}/npm.tgz`);
+} catch(e) {}
 
 try {
     fs.mkdirSync(npmGlobal, { recursive: true });
@@ -14,34 +20,26 @@ try {
     fs.mkdirSync(npmTmp, { recursive: true });
 } catch(e) {}
 
-// Pengaman: kalau mesin NPM kehapus, tarik lagi dari asalnya
-if (!fs.existsSync(`${dataDir}/package/bin/npm-cli.js`)) {
-    console.log("📥 Menarik ulang mesin NPM...");
-    execSync(`node -e 'fetch("https://registry.npmjs.org/npm/-/npm-10.9.0.tgz").then(r=>r.arrayBuffer()).then(b=>require("fs").writeFileSync("${dataDir}/npm.tgz",Buffer.from(b)))'`);
-    execSync(`tar -xzf ${dataDir}/npm.tgz -C ${dataDir}`);
-}
+// 2. Tarik ulang NPM
+console.log("📥 Menarik ulang mesin NPM...");
+execSync(`node -e 'fetch("https://registry.npmjs.org/npm/-/npm-10.9.0.tgz").then(r=>r.arrayBuffer()).then(b=>require("fs").writeFileSync("${dataDir}/npm.tgz",Buffer.from(b)))'`);
+execSync(`tar -xzf ${dataDir}/npm.tgz -C ${dataDir}`);
 
-if (!fs.existsSync(`${npmGlobal}/bin/openclaw`)) {
-    console.log("🔗 Menginstal OpenClaw...");
-    
-    // Injeksi lokasi Temp langsung ke jantung OS, gak usah dilempar via argumen
-    const env = Object.assign({}, process.env, { TMPDIR: npmTmp, npm_config_tmp: npmTmp });
-    
-    // Argumen --tmp dihapus total di sini
-    const npmCmd = `node --max-old-space-size=800 ${dataDir}/package/bin/npm-cli.js --prefix ${npmGlobal} --cache ${npmCache} install -g openclaw --ignore-scripts --no-audit --no-fund --loglevel=error`;
-    
-    try {
-        execSync(npmCmd, { stdio: 'inherit', env: env });
-    } catch(e) {
-        console.log("Abaikan warning kalau ada!");
-    }
-} else {
-    console.log("✅ OpenClaw udah nongkrong dengan aman!");
-}
+// 3. Eksekusi Instalasi
+console.log("🔗 Menginstal OpenClaw...");
+const env = Object.assign({}, process.env, { TMPDIR: npmTmp, npm_config_tmp: npmTmp });
+const npmCmd = `node --max-old-space-size=800 ${dataDir}/package/bin/npm-cli.js --prefix ${npmGlobal} --cache ${npmCache} install -g openclaw --ignore-scripts --no-audit --no-fund --loglevel=error`;
 
-// Bersihin file mentahan biar storage lu lega
 try {
-    execSync(`rm -rf ${dataDir}/npm.tgz ${dataDir}/package`);
+    execSync(npmCmd, { stdio: 'inherit', env: env });
+} catch(e) {
+    console.log("Abaikan warning kalau ada!");
+}
+
+// 4. CLEANUP AKHIR: Hapus cache instalasi biar gak menuhin harddisk
+try {
+    console.log("🧹 Membersihkan cache instalasi...");
+    execSync(`rm -rf ${dataDir}/npm.tgz ${dataDir}/package ${npmCache} ${npmTmp}`);
 } catch(e) {}
 
 console.log("🚀 Menyalakan OmniRoute...");
