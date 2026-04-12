@@ -1,45 +1,48 @@
 const fs = require('fs');
 const { execSync } = require('child_process');
 
-console.log("🔥 Mode Bypass Ekstrem: Mengisolasi Cache & Temp ke Persistent Volume...");
+console.log("🔥 Fix: Membabat argumen palsu yang bikin NPM bingung...");
 
-// 1. Definisikan folder aman di dalam persistent volume
 const dataDir = '/app/data';
 const npmGlobal = `${dataDir}/npm_global`;
 const npmCache = `${dataDir}/npm_cache`;
 const npmTmp = `${dataDir}/npm_tmp`;
 
-// Bikin foldernya kalau belum ada
 try {
     fs.mkdirSync(npmGlobal, { recursive: true });
     fs.mkdirSync(npmCache, { recursive: true });
     fs.mkdirSync(npmTmp, { recursive: true });
 } catch(e) {}
 
-// 2. Sapu bersih sisa sampah instalasi yang bikin error sebelumnya
-try {
-    execSync(`rm -rf ${npmGlobal}/lib/node_modules/.openclaw*`);
-    execSync(`rm -rf ${npmCache}/*`);
-    execSync(`rm -rf ${npmTmp}/*`);
-} catch(e) {}
+// Pengaman: kalau mesin NPM kehapus, tarik lagi dari asalnya
+if (!fs.existsSync(`${dataDir}/package/bin/npm-cli.js`)) {
+    console.log("📥 Menarik ulang mesin NPM...");
+    execSync(`node -e 'fetch("https://registry.npmjs.org/npm/-/npm-10.9.0.tgz").then(r=>r.arrayBuffer()).then(b=>require("fs").writeFileSync("${dataDir}/npm.tgz",Buffer.from(b)))'`);
+    execSync(`tar -xzf ${dataDir}/npm.tgz -C ${dataDir}`);
+}
 
-// 3. Eksekusi Instalasi dengan Isolasi 100%
 if (!fs.existsSync(`${npmGlobal}/bin/openclaw`)) {
-    console.log("🔗 Menginstal OpenClaw... (Aman dari limit 100MB)");
+    console.log("🔗 Menginstal OpenClaw...");
+    
+    // Injeksi lokasi Temp langsung ke jantung OS, gak usah dilempar via argumen
+    const env = Object.assign({}, process.env, { TMPDIR: npmTmp, npm_config_tmp: npmTmp });
+    
+    // Argumen --tmp dihapus total di sini
+    const npmCmd = `node --max-old-space-size=800 ${dataDir}/package/bin/npm-cli.js --prefix ${npmGlobal} --cache ${npmCache} install -g openclaw --ignore-scripts --no-audit --no-fund --loglevel=error`;
+    
     try {
-        // Kita paksa environment variabel OS buat pindah folder Temp ke /app/data
-        const env = Object.assign({}, process.env, { TMPDIR: npmTmp });
-        
-        // Perhatikan parameter --cache dan --tmp yang baru ditambahkan
-        const npmCmd = `node --max-old-space-size=800 /app/data/package/bin/npm-cli.js --prefix ${npmGlobal} --cache ${npmCache} --tmp ${npmTmp} install -g openclaw --ignore-scripts --no-audit --no-fund --loglevel=error`;
-        
         execSync(npmCmd, { stdio: 'inherit', env: env });
     } catch(e) {
-        console.log("Abaikan jika ada warning, gas lanjut!");
+        console.log("Abaikan warning kalau ada!");
     }
 } else {
-    console.log("✅ OpenClaw sudah terinstal aman!");
+    console.log("✅ OpenClaw udah nongkrong dengan aman!");
 }
+
+// Bersihin file mentahan biar storage lu lega
+try {
+    execSync(`rm -rf ${dataDir}/npm.tgz ${dataDir}/package`);
+} catch(e) {}
 
 console.log("🚀 Menyalakan OmniRoute...");
 execSync("node server.js", { stdio: 'inherit' });
